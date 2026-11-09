@@ -6,16 +6,15 @@ workflows:
     integrations:
       app_store_connect: "Numismática Pliego"
     environment:
-      ios_signing:
-        distribution_type: app_store
-        bundle_identifier: eu.pliego.app
       xcode: latest
       cocoapods: default
     scripts:
-      - name: Generar certificados y perfiles en Apple
+      - name: Crear o descargar certificados y perfiles en Apple
         script: |
-          app-store-connect fetch-signing-files "eu.pliego.app" --type IOS_APP_STORE --create
-      - name: Configurar firma
+          app-store-connect fetch-signing-files "eu.pliego.app" \
+            --type IOS_APP_STORE \
+            --create
+      - name: Configurar firma en el proyecto
         script: |
           xcode-project use-profiles
       - name: Instalar dependencias CocoaPods
