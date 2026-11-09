@@ -43,6 +43,13 @@ workflows:
           cd src
           pod install
 
+      - name: Numero de compilacion nuevo
+        script: |
+          NUEVO=$(date +%Y%m%d%H%M)
+          PLIST=$(find . -path "*Pliego/Info.plist" -not -path "*/Pods/*" | head -1)
+          echo "Archivo: $PLIST - numero: $NUEVO"
+          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $NUEVO" "$PLIST" || /usr/libexec/PlistBuddy -c "Add :CFBundleVersion string $NUEVO" "$PLIST"
+
       - name: Compilar IPA
         script: |
           cd src
