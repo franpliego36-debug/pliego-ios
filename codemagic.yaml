@@ -11,6 +11,7 @@ workflows:
     scripts:
       - name: Crear o descargar certificados y perfiles en Apple
         script: |
+          keychain initialize
           app-store-connect fetch-signing-files "eu.pliego.app" \
             --type IOS_APP_STORE \
             --create
