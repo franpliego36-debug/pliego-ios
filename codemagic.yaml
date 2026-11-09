@@ -9,13 +9,18 @@ workflows:
       xcode: latest
       cocoapods: default
     scripts:
-      - name: Crear o descargar certificados y perfiles en Apple
+      - name: Crear certificados y perfiles en Apple
         script: |
           keychain initialize
+          ssh-keygen -t rsa -b 2048 -m PEM -f /tmp/cert_key -q -N ""
           app-store-connect fetch-signing-files "eu.pliego.app" \
             --type IOS_APP_STORE \
-            --create
-      - name: Configurar firma en el proyecto
+            --create \
+            --certificate-key @file:/tmp/cert_key
+      - name: Instalar certificados en el llavero
+        script: |
+          keychain add-certificates
+      - name: Configurar firma en el proyecto Xcode
         script: |
           xcode-project use-profiles
       - name: Instalar dependencias CocoaPods
