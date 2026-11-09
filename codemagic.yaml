@@ -6,7 +6,7 @@ workflows:
     integrations:
       app_store_connect: "Numismática Pliego"
     environment:
-      xcode: latest
+      xcode: 15.4
       cocoapods: default
     scripts:
       - name: Crear certificados y perfiles en Apple
@@ -22,18 +22,20 @@ workflows:
           keychain add-certificates
       - name: Configurar firma en el proyecto Xcode
         script: |
-          xcode-project use-profiles
+          xcode-project use-profiles --project "src/Pliego.xcodeproj"
       - name: Instalar dependencias CocoaPods
         script: |
           cd src
           pod install
       - name: Compilar IPA
         script: |
+          cd src
           xcode-project build-ipa \
-            --workspace "src/Pliego.xcworkspace" \
+            --workspace "Pliego.xcworkspace" \
             --scheme "Pliego"
     artifacts:
       - build/ios/ipa/*.ipa
+      - src/build/ios/ipa/*.ipa
       - /tmp/xcodebuild_logs/*.log
     publishing:
       app_store_connect:
