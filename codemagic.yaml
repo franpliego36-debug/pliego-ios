@@ -6,24 +6,27 @@ workflows:
     integrations:
       app_store_connect: "Numismática Pliego"
     environment:
+      groups:
+        - ios
       xcode: 16.0
       cocoapods: default
     scripts:
       - name: Iniciar llavero del sistema
         script: keychain initialize
 
-      - name: Generar clave privada para el certificado
+      - name: Configurar clave de firma
         script: |
-          ssh-keygen -t rsa -b 2048 -m PEM -f /tmp/cert_key -q -N ""
+          echo "$CERT_KEY" > /tmp/cert_key
+          chmod 600 /tmp/cert_key
 
-      - name: Obtener o crear certificados y perfiles en Apple
+      - name: Obtener certificados y perfiles de Apple
         script: |
           app-store-connect fetch-signing-files "eu.pliego.app" \
             --type IOS_APP_STORE \
             --create \
             --certificate-key @file:/tmp/cert_key
 
-      - name: Añadir certificados al llavero
+      - name: Instalar certificados en el llavero
         script: keychain add-certificates
 
       - name: Aplicar perfiles de firma al proyecto
@@ -37,7 +40,10 @@ workflows:
       - name: Compilar IPA
         script: |
           cd src
-          xcode-project build-ipa --workspace "Pliego.xcworkspace" --scheme "Pliego" || {
+          xcode-project build-ipa \
+            --workspace "Pliego.xcworkspace" \
+            --scheme "Pliego" \
+            --archive-flags "-destination 'generic/platform=iOS'" || {
             echo "--- MOTIVO EXACTO DEL ERROR ---"
             find /tmp/xcodebuild_logs -name "*.log" -exec tail -n 40 {} +
             exit 1
