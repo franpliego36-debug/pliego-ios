@@ -16,7 +16,13 @@ workflows:
 
       - name: Configurar clave de firma
         script: |
-          echo "$CERT_KEY" > /tmp/cert_key
+          if [ -n "$CERTIFICATE_PRIVATE_KEY" ]; then
+            echo "$CERTIFICATE_PRIVATE_KEY" > /tmp/cert_key
+          elif [ -n "$CERT_KEY" ]; then
+            echo "$CERT_KEY" > /tmp/cert_key
+          else
+            ssh-keygen -t rsa -b 2048 -m PEM -f /tmp/cert_key -q -N ""
+          fi
           chmod 600 /tmp/cert_key
 
       - name: Obtener certificados y perfiles de Apple
