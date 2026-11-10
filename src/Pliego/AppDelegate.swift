@@ -1,58 +1,62 @@
 import UIKit
-import WebKit
-import UserNotifications
+import FirebaseCore
+import FirebaseMessaging
 
 @UIApplicationMain
-class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterDelegate {
+class AppDelegate: UIResponder, UIApplicationDelegate {
 
     var window: UIWindow?
 
-    func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
-        // Asignar delegado para recibir avisos incluso con la app abierta
+    func application(_ application: UIApplication,
+                     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
         UNUserNotificationCenter.current().delegate = self
-
-        // Pedir permiso al usuario para recibir notificaciones
-        let authOptions: UNAuthorizationOptions = [.alert, .badge, .sound]
-        UNUserNotificationCenter.current().requestAuthorization(options: authOptions) { granted, error in
-            if granted {
-                DispatchQueue.main.async {
-                    application.registerForRemoteNotifications()
-                }
+        // Si el cliente ya dio permiso, pedimos a Apple el código del móvil en cada arranque.
+        UNUserNotificationCenter.current().getNotificationSettings { settings in
+            if settings.authorizationStatus == .authorized {
+                DispatchQueue.main.async { application.registerForRemoteNotifications() }
             }
         }
-
         return true
     }
 
-    // Apple nos entrega el token del dispositivo
+    // Apple nos da el código del móvil: se lo pasamos a la web, que lo apunta en Pliego.
     func application(_ application: UIApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
-        let tokenParts = deviceToken.map { data in String(format: "%02.2hhx", data) }
-        let token = tokenParts.joined()
-        UserDefaults.standard.set(token, forKey: "apns_device_token")
-
-        // Inyectar en la web para que se registre automáticamente
-        NotificationCenter.default.post(name: NSNotification.Name("APNSDeviceTokenReceived"), object: token)
+        let token = deviceToken.map { String(format: "%02x", $0) }.joined()
+        enviarTokenAWeb(token)
     }
 
     func application(_ application: UIApplication, didFailToRegisterForRemoteNotificationsWithError error: Error) {
-        print("Error al registrar notificaciones remotas en Apple: \(error.localizedDescription)")
+        print("Unable to register for remote notifications: \(error.localizedDescription)")
     }
 
-    // Mostrar el aviso cuando el usuario tiene la app abierta en pantalla
-    func userNotificationCenter(_ center: UNUserNotificationCenter, willPresent notification: UNNotification, withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void) {
-        if #available(iOS 14.0, *) {
-            completionHandler([.banner, .badge, .sound])
-        } else {
-            completionHandler([.alert, .badge, .sound])
+    func application(_ application: UIApplication, didReceiveRemoteNotification userInfo: [AnyHashable: Any],
+                     fetchCompletionHandler completionHandler: @escaping (UIBackgroundFetchResult) -> Void) {
+        sendPushToWebView(userInfo: userInfo)
+        completionHandler(UIBackgroundFetchResult.newData)
+    }
+}
+
+func enviarTokenAWeb(_ token: String) {
+    if (!Pliego.webView.isHidden && !Pliego.webView.isLoading) {
+        DispatchQueue.main.async {
+            Pliego.webView.evaluateJavaScript("window.__apnsToken='\(token)';window.dispatchEvent(new CustomEvent('push-token-apns', { detail: '\(token)' }))")
         }
+    } else {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { enviarTokenAWeb(token) }
+    }
+}
+
+extension AppDelegate: UNUserNotificationCenterDelegate {
+    func userNotificationCenter(_ center: UNUserNotificationCenter,
+                                willPresent notification: UNNotification,
+                                withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void) {
+        completionHandler([[.banner, .list, .sound]])
     }
 
-    // Al pulsar sobre el aviso recibido
-    func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse, withCompletionHandler completionHandler: @escaping () -> Void) {
-        let userInfo = response.notification.request.content.userInfo
-        if let urlDestino = userInfo["url"] as? String {
-            NotificationCenter.default.post(name: NSNotification.Name("AbrirRutaApp"), object: urlDestino)
-        }
+    func userNotificationCenter(_ center: UNUserNotificationCenter,
+                                didReceive response: UNNotificationResponse,
+                                withCompletionHandler completionHandler: @escaping () -> Void) {
+        sendPushClickToWebView(userInfo: response.notification.request.content.userInfo)
         completionHandler()
     }
 }
